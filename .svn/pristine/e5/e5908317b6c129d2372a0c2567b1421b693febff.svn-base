@@ -1,0 +1,343 @@
+package gui;
+
+import driver.*;
+import field.*;
+import gamer.Gamer;
+import gamer.PlayState;
+import gamer.Transition;
+import session.*;
+import soldiers.*;
+import testCase.*;
+
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import javax.swing.event.AncestorListener;
+import javax.swing.SwingUtilities;
+
+import java.awt.*;
+import java.awt.event.ActionListener;
+import java.awt.event.InputEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.awt.event.ActionEvent;
+
+
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import javax.swing.border.Border;
+import java.awt.*;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+
+import static javax.swing.SwingUtilities.isLeftMouseButton;
+import static javax.swing.SwingUtilities.isRightMouseButton;
+
+public class Screen 
+{
+	private final JFrame gameScreen;
+	private final BoardVisual boardVisual;
+	private final Session currentSession;
+	
+	private Tile startTile;
+	private Tile endTile;
+	private Piece grabbedPiece;
+	
+	private static String imagePath = "C:\\Users\\mikeliu8492\\workspace\\Assignment1.1\\piecesPictures\\";
+	
+	private static Dimension OUTSIDE_BORDER = new Dimension(640, 640);
+	private static Dimension CHESSBOARD_SIZE = new Dimension(640, 640);
+	private static Dimension TILE_DIMENSIONS = new Dimension(80, 80);
+
+	public boolean gameContinues()
+	{
+		return currentSession.gameContinues();
+	}
+	
+	public void displayResults()
+	{
+		currentSession.displayFinalResult();
+	}
+	
+	public void resetBoard()
+	{
+		currentSession.resetSession();
+		boardVisual.buildNewBoard();
+	}
+
+	public Screen()
+	{
+		this.currentSession = new Session();
+		this.gameScreen = new JFrame("My Chess Game");
+		this.gameScreen.setLayout(new BorderLayout());
+		final JMenuBar screenBar = new JMenuBar();
+		this.describeScreenBar(screenBar);
+		this.gameScreen.setJMenuBar(screenBar);
+		this.gameScreen.setVisible(true);
+		this.gameScreen.setSize(OUTSIDE_BORDER);
+		this.boardVisual = new BoardVisual();
+		this.gameScreen.add(this.boardVisual, BorderLayout.CENTER);
+		
+	}
+
+	void describeScreenBar(final JMenuBar screenBar)
+	{
+		screenBar.add(createFileOptions());
+		return;
+	}
+	
+	private JMenu createFileOptions() 
+	{
+		final JMenu fileOption = new JMenu("File");
+		final JMenuItem openPic = new JMenuItem("Load Picture");
+		openPic.addActionListener(new ActionListener()
+		{
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				System.out.println("HELLO");		
+			}
+		}
+		
+		);
+		
+		fileOption.add(openPic);
+		
+		final JMenuItem leaveProgram = new JMenuItem("Exit");
+		leaveProgram.addActionListener(new ActionListener()
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
+			{
+				System.exit(0);
+			}
+		}		
+		);
+		
+		fileOption.add(leaveProgram);
+		
+		return fileOption;
+	}
+	
+	private class BoardVisual extends JPanel
+	{
+		final TileVisual [][] boardTiles;
+		public BoardVisual()
+		{
+			super(new GridLayout(8, 8));
+			boardTiles = new TileVisual[8][8];
+			
+			for(int row = 0; row < 8; row++)
+			{
+				for(int col = 0; col < 8; col++)
+				{
+					final TileVisual tile = new TileVisual(this, row, col);
+					this.boardTiles[row][col] = tile;
+					add(tile);
+				}
+			}
+			
+			setPreferredSize(CHESSBOARD_SIZE);
+		}
+		
+		public void buildNewBoard()
+		{
+			removeAll();
+			for(int row = 0; row < 8; row++)
+			{
+				for(int col = 0; col < 8; col++)
+				{
+					this.boardTiles[row][col].renderTile(currentSession.getBoard());
+					add(boardTiles[row][col]);
+				}
+			}
+			validate();
+			repaint();
+		}
+	}
+	
+	private class TileVisual extends JButton
+	{
+		private final int tileRow;
+		private final int tileColumn;
+		
+		/**
+		 * Ported both from Java.util.Swing;
+		 * 
+		 * @param arg0
+		 * @return
+		 */
+		
+		public TileVisual(BoardVisual boardVisual, final int tileRow, final int tileColumn)
+		{
+			super();
+			this.tileRow = tileRow;
+			this.tileColumn = tileColumn;
+			setPreferredSize(TILE_DIMENSIONS);
+			setColor();
+			setPieceIcon(currentSession.getBoard());
+			
+			addMouseListener(new MouseListener() {
+                @Override
+                public void mouseClicked(MouseEvent e) 
+                {
+                	Board currentBoard = currentSession.getBoard();
+                	
+                	if(isRightMouseButton(e))
+                	{
+                		startTile = null;
+                		endTile = null;
+                		grabbedPiece = null;
+                	}
+                	else if (isLeftMouseButton(e))
+                	{
+                		if(startTile == null)
+                		{
+                			startTile = currentBoard.getTile(tileRow, tileColumn);
+                			grabbedPiece = startTile.holdPiece();
+                			
+                			if(grabbedPiece == null)
+                				startTile = null;
+                			else if(grabbedPiece.getColor() != currentSession.getCurrentPlayer().getColor())
+                			{
+                				startTile = null;
+                				grabbedPiece = null;
+                				displayDialogueMessages("Invalid Selection", "You do not control that piece.");
+                			}
+                				
+                			
+                		}
+                		else
+                		{
+                			endTile = currentBoard.getTile(tileRow, tileColumn);
+                			Play possiblePlay = new Play(currentBoard, grabbedPiece, tileRow, tileColumn);
+                			
+                			Gamer currentGamer = currentSession.getCurrentPlayer();
+                			Gamer enemyGamer = currentGamer.getEnemy();
+                			
+                			Transition tempState = currentSession.makeMove(possiblePlay);
+                			if(tempState.getPlayState() == PlayState.ILLEGAL)
+                				displayDialogueMessages("Illegal Move", "Illegal Move.  Please try again");
+                			else if (tempState.getPlayState() == PlayState.KING_STILL_VULNERABLE)
+                				displayDialogueMessages("In Check", "Your King is Check");
+                			else if(tempState.getPlayState() == PlayState.COMPLETE)
+                			{
+                				currentSession.setChessBoard();
+                				System.out.println("legal move board should change");
+                				
+                			}
+                			
+                			startTile = null;
+                			endTile = null;
+                			grabbedPiece = null;
+                		}
+                		
+                		SwingUtilities.invokeLater(new Runnable()
+        				{
+
+							@Override
+							public void run() 
+							{
+								// TODO Auto-generated method stub
+								boardVisual.buildNewBoard();
+								
+							}
+						});
+                		
+                	}
+                		
+                	else
+                	{
+                		if(grabbedPiece != null)
+                		{
+                			
+                		}
+                		else
+                		{
+                			System.out.println("empty space");
+                		}
+                			
+                	}
+                		
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) { }
+
+                @Override
+                public void mouseReleased(MouseEvent e) { }
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+      
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+ 
+                }
+            });
+			
+		}
+		
+		
+		
+		
+		
+	
+		public void renderTile(Board chessBoard)
+		{
+			removeAll();
+			setColor();
+			setPieceIcon(chessBoard);
+			validate();
+			repaint();
+		}
+
+
+
+		private void setPieceIcon(final Board chessBoard)
+		{
+
+			if(chessBoard.getTile(tileRow, tileColumn).isFilled())
+			{
+				try
+				{
+					String pieceString = chessBoard.getTile(tileRow, tileColumn).holdPiece().toString();
+					final BufferedImage myPiece = ImageIO.read(new File(imagePath + pieceString +".gif"));
+					add(new JLabel(new ImageIcon(myPiece)));
+				}
+				catch(IOException e)
+				{
+					e.printStackTrace();
+				}
+				
+			}
+		}
+		
+		
+		private void setColor()
+		{
+			if(tileRow == 0 || tileRow == 2 || tileRow == 4 || tileRow == 6)
+				this.setBackground(tileColumn % 2 == 0 ? Color.WHITE : Color.GRAY);
+			else
+				this.setBackground(tileColumn % 2 != 0 ? Color.WHITE : Color.GRAY);
+		}
+		
+	}
+	
+	private void displayDialogueMessages(String Title, String Message)
+	{
+		JFrame frame = new JFrame(Title);
+		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); 
+		JOptionPane.showMessageDialog(frame, Message);
+	    frame.pack();
+	    frame.setVisible(true);
+	}
+	
+}

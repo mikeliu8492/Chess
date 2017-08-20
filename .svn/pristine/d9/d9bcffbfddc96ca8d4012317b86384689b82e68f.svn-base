@@ -1,0 +1,322 @@
+package session;
+
+import field.*;
+import soldiers.*;
+import gamer.*;
+
+import java.util.*;
+
+public class Session 
+{
+	private Board chessBoard;
+	private BlackGamer black;
+	private WhiteGamer white;
+	private Gamer currentPlayer;
+	private Collection<Play> currentPlayerValidMoves;
+	private Collection<Play> enemyValidMoves;
+	
+	//transition board 
+	private Board intermediateBoard;
+	
+	/**
+	 * Game Trackers
+	 * */
+	
+	int blackVictory = 0;
+	int whiteVictory = 0;
+
+	int consentCountGameOver = 0;
+		
+	boolean agreedEnd = false;
+	boolean blackSurrendered = false;
+	boolean whiteSurrendered = false;
+	
+	/**
+	 * History board
+	 * 
+	 */
+	
+	private ArrayList<Board> historyOfGame;
+	
+	
+	public void surrender()
+	{
+		if(currentPlayer.getColor() == Side.WHITE)
+			whiteSurrendered = true;
+		else
+			blackSurrendered = true;
+	}
+	
+	public void agreedOver()
+	{
+		consentCountGameOver++;
+		if(consentCountGameOver == 2)
+		{
+			agreedEnd = true;
+		}
+	}
+	
+	public Board getBoard()
+	{
+		return chessBoard;
+	}
+	
+	
+	public boolean sessionStalemate()
+	{
+		return black.reachedStalemate() || white.reachedStalemate();
+		
+	}
+	
+	public boolean sessionCheckMate()
+	{
+		return black.inCheckmate() || white.inCheckmate();
+	}
+
+	
+	
+	/**
+	 * start up a new session, this serves as a wrapper function for our other classes like board and players
+	 */
+	public Session()
+	{
+		chessBoard = new Board();
+		intermediateBoard = null;
+		white = new WhiteGamer(chessBoard, this, chessBoard.getWhiteValidMove(), chessBoard.getBlackValidMove());
+		black = new BlackGamer(chessBoard, this, chessBoard.getBlackValidMove(), chessBoard.getWhiteValidMove());
+		
+		//initialize the white player as current player
+		currentPlayer = white; 
+		//initialize the currentPlayer moves as the white valid moves
+		currentPlayerValidMoves = chessBoard.getWhiteValidMove(); 
+		//initialize the opposing moves and the black valid moves
+		enemyValidMoves = chessBoard.getBlackValidMove(); 
+		//initialize the historyOfGameBoard
+		historyOfGame = new ArrayList<Board>();
+	}
+	
+	
+	/**
+	 * show the board on console
+	 */
+	public void showBoard()
+	{
+		chessBoard.displayBoard();
+	}
+	
+	
+	/**
+	 * change the current turn
+	 */
+	public void changeTurn()
+	{
+		if (currentPlayer == white)
+			assignLists(black, chessBoard.getBlackValidMove(), chessBoard.getWhiteValidMove());
+		else if(currentPlayer == black)
+			assignLists(white, chessBoard.getWhiteValidMove(), chessBoard.getBlackValidMove());
+		
+	}
+	
+	/**
+	 * helper functions to swap the valid move sets and current player
+	 * @param toBeAssigned		which player will be assigned to current player
+	 * @param listFirst			assigned to the current player valid moves
+	 * @param listSecond		assigned to the opponent valid moves
+	 */
+	private void assignLists(Gamer toBeAssigned, Collection<Play> listFirst, Collection<Play> listSecond)
+	{
+		currentPlayer = toBeAssigned;
+		currentPlayerValidMoves = listFirst;
+		enemyValidMoves = listSecond;
+	}
+	
+	
+	/**
+	 * function to display the current player's possible move options
+	 */
+	public void displayMoveOptions()
+	{
+		
+		if(currentPlayer == white)
+		{
+			System.out.println("White player's turn:  ");
+		}
+		else
+		{
+			System.out.println("Black player's turn:  ");
+		}
+		
+		int counter = 1;
+		
+		for(Play option : currentPlayerValidMoves)
+		{
+			System.out.print(counter + ")   ");
+			helpDisplayMove(option);
+			counter++;
+		}
+	}
+	
+	/**
+	 * helper method to display an individual move
+	 * @param 		Reference to specific Pieces move from one location to another
+	 */
+	private void helpDisplayMove(Play option)
+	{
+		
+		Piece currentPiece = option.getPiece();
+		currentPiece.printPiece();
+		
+		System.out.print("  Original Row  " + currentPiece.getPieceRow() + " Original Column " + currentPiece.getPieceColumn());
+		System.out.print("  New Row  " + option.getTargetRow()+ " New Column " + option.getTargetColumn()+ "\n " );
+	}
+	
+	/**
+	 * 
+	 * @return the current black player
+	 */
+	
+	public Gamer getBlackGamer()
+	{
+		return black;
+	}
+	
+	
+	/**
+	 * 
+	 * @return the current white player
+	 */
+	public Gamer getWhiteGamer()
+	{
+		return white;
+	}
+	
+	
+	/**
+	 * Wrapper function for selecting a specific piece.
+	 * 
+	 * @param originalRow			original piece row
+	 * @param originalColumn		original piece column
+	 * @param newRow				row where you want to move your piece
+	 * @param newColumn				column where you want to move your piece
+	 * @return						whether the move can be made (legally and without putting King in Check)
+	 */
+	public Transition makeMove (Play possiblePlay)
+	{
+		System.out.println("made move");
+		Transition temp = currentPlayer.requestPlay(possiblePlay, enemyValidMoves);
+		intermediateBoard = temp.materializeBoard();
+		
+		
+		return temp;
+	}
+	
+	
+	/**
+	 * function to call to create a new board and assign that new board with its valid move sets to both players
+	 * IF YOU ANSWER YES, THIS CANNOT BE UNDONE!
+	 * 
+	 * IF NO, the board was restored to as before.
+	 */
+	 
+	public void setChessBoard()
+	{
+		
+		chessBoard = intermediateBoard;
+		this.chessBoard = intermediateBoard;
+		intermediateBoard = null;
+		this.chessBoard.updateLists();
+				
+		white.changeStatus(this.chessBoard, this.chessBoard.getWhiteValidMove(), this.chessBoard.getBlackValidMove());
+		black.changeStatus(this.chessBoard, this.chessBoard.getBlackValidMove(), this.chessBoard.getWhiteValidMove());
+			
+		changeTurn();
+
+	}
+	
+	
+	
+	
+	
+	/**
+	 * Function to print current turn
+	 */
+	public void printCurrentTurn()
+	{
+		if(currentPlayer.getColor() == Side.WHITE)
+			System.out.println("White Player's Turn\n\n");
+		else
+			System.out.println("Black Player's Turn\n\n");
+	}
+	
+	public Gamer getCurrentPlayer()
+	{
+		return this.currentPlayer;
+	}
+	
+	
+	public void displayFinalResult()
+	{
+		if(this.getBlackGamer().inCheckmate())
+		{
+			whiteVictory++;
+			System.out.println("WHITE WINS!");
+		}
+		else if(this.getWhiteGamer().inCheckmate())
+		{
+			blackVictory++;
+			System.out.println("BLACK WINS!");
+		}
+		else if(blackSurrendered)
+		{
+			whiteVictory++;
+			System.out.println("WHITE WINS!");
+			blackSurrendered = false;
+		}
+		else if(whiteSurrendered)
+		{
+			blackVictory++;
+			System.out.println("BLACK WINS!");
+			whiteSurrendered = false;
+		}
+		else if(agreedEnd)
+		{
+			System.out.println("NOBODY WON!");
+			agreedEnd = false;
+		}	
+		else if(white.reachedStalemate() || black.reachedStalemate())
+			System.out.println("STALEMATE!");
+		
+	}
+	
+	public boolean gameContinues()
+	{
+		boolean sessionCheckmate = white.inCheckmate() || black.inCheckmate();
+		boolean sessionStalemate = white.reachedStalemate() || black.reachedStalemate();
+		boolean neitherSurrender = !blackSurrendered && !whiteSurrendered;
+		
+		return !sessionCheckmate && !sessionStalemate && !agreedEnd && neitherSurrender;
+				
+	}
+	
+	public void resetSession()
+	{
+		chessBoard = new Board();
+		consentCountGameOver = 0;
+		agreedEnd = false;
+		blackSurrendered = false;
+		whiteSurrendered = false;
+		
+		white.changeStatus(this.chessBoard, this.chessBoard.getWhiteValidMove(), this.chessBoard.getBlackValidMove());
+		black.changeStatus(this.chessBoard, this.chessBoard.getBlackValidMove(), this.chessBoard.getWhiteValidMove());
+	}
+	
+	public int getWhitePoints()
+	{
+		return whiteVictory;
+	}
+	
+	public int getBlackPoints()
+	{
+		return whiteVictory;
+	}
+}

@@ -1,0 +1,49 @@
+package driver;
+
+import field.*;
+import gamer.*;
+import soldiers.*;
+import session.*;
+
+import java.util.*;
+import gui.*;
+
+
+/*
+ * A simple test driver
+ * */
+
+public class Driver 
+{
+	static boolean playForever = true;
+	static char restart = 'n';
+	
+	public static void main(String arg[])
+	{
+		Scanner myScan = new Scanner(System.in);
+		Screen myScreen = new Screen();
+		while (playForever)
+		{
+			while(myScreen.gameContinues())
+			{
+				;//spin, spin spin
+			}
+			
+			myScreen.displayResults();
+			
+			
+			System.out.print("restart game?  ");
+			restart = myScan.next().charAt(0);
+			if(restart != 'y')
+				playForever = false;
+			else
+				myScreen.resetBoard();
+			
+			
+		}
+
+	}
+
+	
+
+}

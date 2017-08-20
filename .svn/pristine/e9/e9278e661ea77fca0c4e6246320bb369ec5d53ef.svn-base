@@ -1,0 +1,134 @@
+package testCase;
+
+import session.*;
+import soldiers.*;
+
+import java.util.Collection;
+
+import field.Board;
+import field.Tile;
+import gamer.Gamer;
+import junit.framework.TestCase;
+
+public class SessionTest extends TestCase 
+{
+
+	/**
+	 * Test if the player can change turn properly.
+	 */
+	
+	public void testChangeTurn() 
+	{
+		//by default the session starts out as White player
+		Session mySession = new Session();
+		Gamer myGamer = mySession.getCurrentPlayer();
+		assertTrue(myGamer.getColor() == Side.WHITE);
+		assertTrue(myGamer == mySession.getWhiteGamer());
+		
+		mySession.changeTurn();
+		myGamer = mySession.getCurrentPlayer();
+		assertTrue(myGamer.getColor() == Side.BLACK);
+		assertTrue(myGamer == mySession.getBlackGamer());
+		
+	}
+
+	/**
+	 * Make a valid move.  Then test to see if new board has correct positions.
+	 * 
+	 * */
+	/*
+	public void testMakeMoveValid() 
+	{
+		Session mySession = new Session();
+		Board originalBoard = mySession.getBoard();
+		mySession.makeMove(6, 0, 4, 0);
+		mySession.commitMove('y');
+		Board newBoard = mySession.getBoard();
+		
+		Tile myTile = newBoard.getTile(4, 0);
+		Tile oldTile = newBoard.getTile(6, 0);
+		Piece myPiece = myTile.holdPiece();
+		
+		assertNotSame(originalBoard, newBoard);
+		assertFalse(oldTile.isFilled());
+		assertTrue(myTile.isFilled());
+		assertTrue(myPiece instanceof Pawn);
+	}
+	
+	/**
+	 * Test if a move is valid and you do not commit.  Then test if the old board is restored.
+	 */
+	/*
+	public void testMakeMoveValidNoCommit() 
+	{
+		
+		Session mySession = new Session();
+		Board originalBoard = mySession.getBoard();
+		mySession.makeMove(6, 0, 4, 0);
+		mySession.commitMove('n');
+		Board newBoard = mySession.getBoard();
+		
+		Tile myTile = newBoard.getTile(4, 0);
+		Tile oldTile = newBoard.getTile(6, 0);
+		Piece myPiece = oldTile.holdPiece();
+		
+		assertEquals(originalBoard, newBoard);
+		assertTrue(oldTile.isFilled());
+		assertTrue(myPiece instanceof Pawn);
+		assertFalse(myTile.isFilled());
+		
+		
+	}
+	
+
+	
+	public void testMakeMoveIllegal() 
+	{
+		Session mySession = new Session();
+		assertFalse(mySession.makeMove(8, 0, 8, 0));
+	}
+	
+	
+	public void testMakeMoveIllegal_two() 
+	{
+		Session mySession = new Session();
+		assertFalse(mySession.makeMove(7, 0, 1, 0));
+	}
+	
+
+	public void testMakeMoveIllegal_three() 
+	{
+		Session mySession = new Session();
+		assertFalse(mySession.makeMove(7, 1, 5, 3));
+	}
+	
+
+
+	public void testPieceCaptured()
+	{
+		Session mySession = new Session();
+		mySession.makeMove(6, 0, 4, 0);
+		mySession.commitMove('y');
+		mySession.makeMove(1, 0, 3, 0);
+		mySession.commitMove('y');
+		mySession.makeMove(6, 1, 4, 1);
+		mySession.commitMove('y');
+		mySession.makeMove(3, 0, 4, 1);
+		mySession.commitMove('y');
+		
+		Board currentBoard = mySession.getBoard();
+		Collection<Piece> white = currentBoard.yourActiveWhitePieces();
+		Collection<Piece> black = currentBoard.yourActiveBlackPieces();
+		
+		assertEquals(15, white.size());
+		assertEquals(16, black.size());
+		
+		Piece myPiece = currentBoard.getTile(4, 1).holdPiece();
+		assertTrue(myPiece instanceof Pawn);
+		assertTrue(myPiece.getColor() == Side.BLACK);
+		
+
+	}
+
+	*/
+}

@@ -1,0 +1,328 @@
+package gamer;
+
+import soldiers.*;
+import field.*;
+import session.*;
+
+import java.util.*;
+
+public abstract class Gamer 
+{
+	
+	protected Board chessBoard;
+	protected final Session currentSession;
+	protected King myKing;
+	protected Collection<Play> currentMoveOptions;
+	protected Collection<Play> opponentMoveOptions;
+	
+	protected boolean currentlyCheck;
+	
+	protected Piece lastPieceMoved;
+	protected int lastPieceRow;
+	protected int lastPieceColumn;
+	
+	/**
+	 * Create a new Gamer object
+	 * @param passInBoard			reference to specific chessBoard
+	 * @param currentSession		reference to specific Session
+	 * @param currentMoveOptions 	reference to current user's valid moves
+	 * @param opponentOptions		reference to the opponent's valid moves
+	 */
+	
+	public Gamer(final Board passInBoard, Session currentSession, Collection<Play> currentMoveOptions, Collection<Play> opponentOptions)
+	{
+		this.chessBoard = passInBoard;
+		this.currentSession = currentSession;
+		this.currentMoveOptions = new ArrayList<Play>(currentMoveOptions);
+		this.opponentMoveOptions = new ArrayList<Play>(opponentOptions);
+		this.currentlyCheck = inCheck();
+		this.lastPieceMoved = null;
+	}
+	
+
+	/**
+	 * Every time the board changes, the valid moves will change for both sides.
+	 * Both players will get the updated board and information.
+	 * @param passInBoard			new Board settings
+	 * @param currentMoveOptions	new set of your own valid moves
+	 * @param opponentOptions		new set of your opponent's valid moves
+	 */
+
+	public void changeStatus(Board passInBoard, Collection<Play> currentMoveOptions, Collection<Play> opponentOptions)
+	{
+		this.chessBoard = passInBoard;
+		this.myKing = kingSearch();
+		this.currentMoveOptions = currentMoveOptions;
+		this.opponentMoveOptions = opponentOptions;
+	}
+
+	
+	/**
+	 * Used to evaluate if for a particular piece an opponent can attack it in its current position.
+	 * Useful for determining if the King is in check.
+	 * 
+	 * @param targetRow			row of the Piece under threat
+	 * @param targetColumn		column of Piece under threat
+	 * @param opponentPlays		list of valid plays made by opponent
+	 * @return					list of Valid plays that can be made by opponent
+	 */
+	public static Collection<Play> possibleThreats(int targetRow, int targetColumn, Collection<Play> opponentPlays)
+	{
+		List<Play> attackPlays = new ArrayList<Play>();
+		
+		for(Play currentThreat : opponentPlays)
+		{
+			
+			if(targetRow == currentThreat.getTargetRow() && targetColumn == currentThreat.getTargetColumn())
+				attackPlays.add(currentThreat);
+		}
+		
+		return attackPlays;
+		
+	}
+	
+	
+	
+	/**
+	 * 
+	 * @return the Collection of valid moves for current player
+	 */
+	public Collection<Play> getMoveOptions()
+	{
+		return currentMoveOptions;
+	}
+	
+	
+	/**
+	 * 
+	 * @return the reference to the current player's king on the board
+	 */
+	private King kingSearch()
+	{
+		for(Piece individualPiece : findLivingPieces())
+		{
+			if (individualPiece instanceof King)
+				return (King) individualPiece;
+		}
+		
+		return null;
+	}
+	
+	
+	/**
+	 * determine if king is in check
+	 * @return 		bool of whether king is in check
+	 */
+	public boolean inCheck()
+	{
+		this.myKing = kingSearch();
+		Collection<Play> threatList = Gamer.possibleThreats(myKing.getPieceRow(), myKing.getPieceColumn(), this.opponentMoveOptions);
+		currentlyCheck = !threatList.isEmpty();
+		return currentlyCheck;
+	}
+	
+	
+	/**
+	 * king is in check and there are no legal moves a player can make
+	 * @return checkMate state
+	 */
+	
+	
+	public boolean inCheckmate()
+	{
+		return inCheck() && !canEscape(this.opponentMoveOptions);
+	}
+	
+	/**
+	 * king is NOT in check but there are no legal moves that player can make
+	 * @return staleMate state
+	 */
+	
+	public boolean reachedStalemate()
+	{
+		return !inCheck() && !canEscape(this.opponentMoveOptions);
+	}
+
+	/** 
+	 * player can make a legal move without placing King in check
+	 * @param opponentValidPlays list of valid plays that can be made by your opponent
+	 * @return boolean on whether the player can make a legal move
+	 */
+	 
+	public boolean canEscape(Collection<Play> opponentValidPlays)
+	{
+		for (Play possiblePlays : this.currentMoveOptions)
+		{
+			Transition temporaryMove = requestPlay(possiblePlays, opponentValidPlays);
+			if(temporaryMove.getPlayState() == PlayState.COMPLETE)
+				return true;
+		}
+		
+		return false;
+	}
+	
+	
+	/**
+	 * Player can make a request for a play.  If it is illegal(e.g. out of bounds, piece rule broken, etc.),
+	 * the play would be canceled.  If play would put Player's king in Check, then play is canceled.
+	 * 
+	 * @param possiblePlay			Play that is requested
+	 * @param opponentValidPlays	All valid plays that can be made by opponent
+	 * @return
+	 */
+	public Transition requestPlay(Play possiblePlay, Collection<Play> opponentValidPlays)
+	{
+		/*
+		 * if a play is not valid (e.g. piece cannot move in a certain fashion or would
+		 * move out of bounds, then return the original board
+		 * */
+		
+		if(!isValidPlay(possiblePlay))
+		{
+			return new Transition(this.chessBoard, possiblePlay, PlayState.ILLEGAL);
+		}
+		
+		/*create the new board, rearrange the pieces, and then retake the roster
+		 * of moves and pieces
+		*/
+		Board temporaryBoard = execute(possiblePlay);
+		rearrangeBoard(temporaryBoard, possiblePlay);
+		temporaryBoard.updateLists();
+		
+		
+		Gamer tempCurrent;
+		
+		if(this.getColor() == Side.WHITE)
+		{
+			tempCurrent = new WhiteGamer(temporaryBoard, this.currentSession, temporaryBoard.getWhiteValidMove(), temporaryBoard.getBlackValidMove());
+		}
+		else
+		{
+			tempCurrent = new BlackGamer(temporaryBoard, this.currentSession, temporaryBoard.getBlackValidMove(), temporaryBoard.getWhiteValidMove());
+		}
+		
+		
+		if(tempCurrent.inCheck())
+		{
+			return new Transition(this.chessBoard, possiblePlay, PlayState.KING_STILL_VULNERABLE);
+		}
+		
+		return new Transition(temporaryBoard, possiblePlay, PlayState.COMPLETE);
+	}
+	
+	/**
+	 * Helper function to assess if play is valid
+	 * @param possiblePlay		Play passed in to assess validity
+	 * @return 					boolean on whether play is in the list of valid plays
+	 */
+	private boolean isValidPlay(Play possiblePlay)
+	{
+		
+		Collection<Play> temp = possiblePlay.getPiece().calculatePlays(this.chessBoard);
+		
+		for(Play currentPlay : temp)
+		{
+			
+			if(currentPlay.getTargetColumn() == possiblePlay.getTargetColumn() && currentPlay.getTargetRow() == possiblePlay.getTargetRow())
+			{
+				return true;
+			}	
+		}
+		return false;
+	}
+	
+	
+	/**
+	 * If a play is physically valid, then create a new board based on that play
+	 * @param possiblePlay		Play to be executed
+	 * @return					A new board.
+	 */
+	public Board execute(Play possiblePlay)
+	{
+		Board newState = new Board(1);
+		
+		for(Piece piece : chessBoard.yourActiveWhitePieces())
+		{
+			newState.setFilled(piece.getPieceRow(), piece.getPieceColumn(), piece);
+		}
+		
+		for(Piece piece : chessBoard.yourActiveBlackPieces())
+		{
+			newState.setFilled(piece.getPieceRow(), piece.getPieceColumn(), piece);
+		}
+		
+		newState.updateLists();
+		
+		return newState;
+		
+	}
+	
+	
+	/**
+	 * Modify the board by moving piece position or capture the specific pieces
+	 * @param board				Board that is passed in
+	 * @param possiblePlay		Play that is passed in
+	 */
+	
+	private void rearrangeBoard(Board board, Play possiblePlay)
+	{
+		int oldRow = possiblePlay.getPiece().getPieceRow();
+		int oldColumn = possiblePlay.getPiece().getPieceColumn();
+		
+		int finalRow = possiblePlay.getTargetRow();
+		int finalColumn = possiblePlay.getTargetColumn();	
+		
+		Piece temp = possiblePlay.getPiece();
+		
+		this.lastPieceRow = temp.getPieceRow();
+		this.lastPieceColumn = temp.getPieceColumn();
+		
+		board.setFilled(finalRow, finalColumn, temp);
+		board.setEmpty(oldRow, oldColumn);
+		
+		
+		lastPieceMoved = board.getTile(finalRow, finalColumn).holdPiece();
+		lastPieceMoved.getMoveHistory().add(new MovePair(finalRow-oldRow, finalColumn-oldColumn));
+		
+	}
+	
+	/**
+	 * 
+	 * @return	reference to the last piece moved;
+	 */
+	public Piece getLastPieceMoved()
+	{
+		return lastPieceMoved;
+	}
+	
+	/**
+	 * 
+	 * @return		a collection of current Living pieces
+	 */
+	public abstract Collection<Piece> findLivingPieces();
+	
+	/**
+	 * 
+	 * @return			your own color
+	 */
+	public abstract Side getColor();
+	
+	/**
+	 * 
+	 * @return		your opponent Objects
+	 */
+	public abstract Gamer getEnemy();
+	
+	
+	public int getLastPieceRow()
+	{
+		return this.lastPieceRow;
+	}
+	
+	public int getLastPieceColumn()
+	{
+		return this.lastPieceColumn;
+	}
+	
+
+}
